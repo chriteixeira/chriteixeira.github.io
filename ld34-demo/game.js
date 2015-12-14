@@ -1803,22 +1803,33 @@ CollisionManager.prototype.hitGround = function(){
 	for(var i=0; i < this.sceneObjectManager.groundObjects.length; i++){
 		var player = this.player.sprite;
 		var obj = this.sceneObjectManager.groundObjects[i].sprite;
-		var a = [obj.position.x - obj.width/2, obj.position.y];
-		var b = [obj.position.x + obj.width/2, obj.position.y];
+		var line = this.sceneObjectManager.groundObjects[i].getGroundLine();
 		var circle = [player.position.x,player.position.y];
-		if(collide(a, b, circle, player.width)){
-			return true;
+		if(collide(line.a, line.b, circle, player.width/2)){
+			return this.sceneObjectManager.groundObjects[i];
 		}
+		
+		//var r1 = {x: player.position.x - player.width/2,
+		//		  y: player.position.y - player.height/2,
+		//		  width: player.width,
+		//		  height: player.height},
+		//	r2 = {x: obj.position.x,
+		//		  y: obj.position.y,
+		//		  width: obj.width,
+		//		  height: obj.height};
+		//if( isIntersecting(r1, r2)){
+		//	return this.sceneObjectManager.groundObjects[i];
+		//}
 	}
-	return false;
+	return undefined;
 }
 
 
 function isIntersecting(r1, r2) {
-	return !(r2.position.x >= (r1.position.x + r1.width) || 
-    	       (r2.position.x + r2.width) <= r1.position.x || 
-        	   r2.position.y >= (r1.position.y + r1.height) ||
-           	   (r2.position.y + r2.height) <= r1.position.y);
+	return !(r2.x >= (r1.x + r1.width) || 
+    	       (r2.x + r2.width) <= r1.x || 
+        	   r2.y >= (r1.y + r1.height) ||
+           	   (r2.y + r2.height) <= r1.y);
 }
 
 
@@ -1836,7 +1847,12 @@ CONSTANTS.OBJECT_TYPE_GROUND_RECT = 0;
 CONSTANTS.OBJECT_TYPE_GROUND_UP = 1;
 CONSTANTS.OBJECT_TYPE_GROUND_DOWN = 2;
 
+CONSTANTS.OBJECT_TYPE_GROUND_MIN = 720;
+CONSTANTS.OBJECT_TYPE_GROUND_MAX = 450;
+
 CONSTANTS.TILE_SIZE = 70;
+
+CONSTANTS.OBJ_BUFFER = 1000;
 
 module.exports = CONSTANTS;
 },{}],11:[function(require,module,exports){
@@ -1857,26 +1873,22 @@ function GameManager(PIXI, stage, scenario, player, settings){
 	this.collisionManager = new CollisionManager(this.player, this.sceneObjectManager);
 		
 	this.configureKeyboard();
-	this.createGroundObjects();
+}
+
+GameManager.prototype.proceduralGeneration = function(){
+	sceneObjectManager.proceduralGeneration();
 }
 
 GameManager.prototype.animate = function(){
+	this.sceneObjectManager.animate();
 	this.player.executeAnimation(this.collisionManager);
 	this.scenario.executeAnimation();
-	this.sceneObjectManager.animate();
-	this.sceneObjectManager.decay();
+	
 };
 
-GameManager.prototype.createGroundObjects = function(){
-	for(var i=0; i < 15; i++){
-		this.sceneObjectManager.createGroundObj(this.stage, {x: 70 * i, y: 600});
-	}
-	
-	this.sceneObjectManager.createGroundUpObj(this.stage, {x: 70 * 15, y: 600});
-	this.sceneObjectManager.createGroundUpObj(this.stage, {x: 70 * 16, y: 600-70});
-	this.sceneObjectManager.createGroundUpObj(this.stage, {x: 70 * 17, y: 600-70-70});
-	this.sceneObjectManager.createGroundDownObj(this.stage, {x: 70 * 18, y: 600-70-70-70});
-};
+GameManager.prototype.decay = function(){
+	this.sceneObjectManager.decay();
+}
 
 GameManager.prototype.configureKeyboard = function(){
 	var dec = keyboard.addKey(keyboard.KEY_ARROW_DOWN),
@@ -1921,10 +1933,10 @@ var settings = JSON.parse('{ '+
 			'"player": { ' +
 				'"position":{ '+ 
 					'"x": 200, '+
-					'"y": 500' +
+					'"y": 400' +
 				'},'+
-				'"width": 50,'+
-				'"height" : 50'+
+				'"width": 75,'+
+				'"height" : 75'+
 			'},'+
 			'"groundtile": {'+
 				'"position": {'+
@@ -1933,8 +1945,8 @@ var settings = JSON.parse('{ '+
 				'},'+
 				'"size": 70'+
 			'},'+
-			'"angularVelocity": 0.2,'+
-			'"gravity": 30,'+
+			'"angularVelocity": 0.1,'+
+			'"gravity": 5,'+
 			'"factor": 0.15'+
 	'}');
 settings.linearVelocity = getLinearVelocity(settings.angularVelocity, settings.player.width);
@@ -1948,9 +1960,9 @@ var stage = new PIXI.Stage(0x000000);
 var graphics = new PIXI.Graphics();
 
 //create the game objects
-var scenario = new Scenario(PIXI, PIXI.Texture.fromImage('assets/images/bg_far.png'), window.innerWidth, window.innerHeight, settings.linearVelocity, settings.factor);
+var scenario = new Scenario(PIXI, PIXI.Texture.fromImage('assets/images/bg_far.png'), window.innerWidth, window.innerHeight, settings.linearVelocity);
 var fpsText = new TextObject(PIXI, "FPS: ", {font: '24px Arial'}, {x: 0, y: 0});
-var player = new Player(PIXI, PIXI.Texture.fromImage('assets/images/player.png'),{width: settings.player.width, height: settings.player.height},settings.player.position, settings.angularVelocity, settings.factor);
+var player = new Player(PIXI, PIXI.Texture.fromImage('assets/images/player.png'),{width: settings.player.width, height: settings.player.height},settings.player.position, settings.angularVelocity, settings.gravity);
 
 //Control data
 var lastDate = new Date();
@@ -1962,6 +1974,11 @@ player.addPlayer(stage);
 fpsText.addText(stage);
 
 var gameManager = new GameManager(PIXI, stage, scenario, player, settings);
+
+setInterval(function(){ gameManager.decay(); }, 1);
+setInterval(function(){ gameManager.proceduralGeneration(); }, 1);
+
+
 
 gameLoop();
 
@@ -28220,7 +28237,8 @@ module.exports = function () {
 
 },{"../../Resource":134,"../../b64":135}],139:[function(require,module,exports){
 
-function Player(PIXI, texture, size, position, angularVelocity){
+var CONSTANTS = require('./constants.js');
+function Player(PIXI, texture, size, position, angularVelocity, gravity){
 	this.sprite = new PIXI.Sprite(texture);
 	this.sprite.anchor.x = 0.5;
 	this.sprite.anchor.y = 0.5;
@@ -28229,6 +28247,7 @@ function Player(PIXI, texture, size, position, angularVelocity){
 	this.sprite.width = size.width;
 	this.sprite.height = size.height;
 	this.velocity = angularVelocity;
+	this.gravity = gravity;
 }
 
 Player.prototype.addPlayer = function(stage){
@@ -28239,27 +28258,34 @@ Player.prototype.executeAnimation = function(collisionManager){
 	this.sprite.rotation += this.velocity;
 	
 	//Simulate the gravity (the player will fall until it hit the ground)
-	if( !collisionManager.hitGround() ){
-		this.sprite.position.y += 1;
+	var groundObj = collisionManager.hitGround();
+	if( groundObj === undefined ){
+		this.sprite.position.y += this.gravity;
+	}
+	else if(groundObj.subtype === CONSTANTS.OBJECT_TYPE_GROUND_UP){
+		this.sprite.position.y -= this.velocity * this.sprite.width;
+	}
+	else if(groundObj.subtype === CONSTANTS.OBJECT_TYPE_GROUND_DOWN){
+		this.sprite.position.y += this.gravity;
 	}
 };
 
 Player.prototype.increase = function(factor){
-	this.sprite.scale.x += factor * this.sprite.scale.x;
-	this.sprite.scale.y += factor * this.sprite.scale.y;
-	//this.sprite.position.y -= this.sprite.heigth * factor / 2;
+	this.sprite.width += this.sprite.width * factor;
+	this.sprite.height += this.sprite.height * factor;
+	this.sprite.position.y -= this.sprite.height * factor / 2;
 };
 
 Player.prototype.decrease = function(factor){
-	this.sprite.scale.x -= factor * this.sprite.scale.x;
-	this.sprite.scale.y -= factor * this.sprite.scale.y;
-	//this.sprite.position.y += this.sprite.heigth * factor / 2;
+	this.sprite.width -= this.sprite.width * factor;
+	this.sprite.height -= this.sprite.height * factor;
+	//this.sprite.position.y += this.sprite.height * factor / 2;
 };
 
 
 module.exports = Player;
 
-},{}],140:[function(require,module,exports){
+},{"./constants.js":10}],140:[function(require,module,exports){
 function Scenario(PIXI, textureFar, width, height, velocity){
 	this.spriteFar = new PIXI.TilingSprite(textureFar, width, height);
 	this.velocity = velocity;
@@ -28275,11 +28301,11 @@ Scenario.prototype.executeAnimation = function(isAcc, isDeAcc, timeElapsed){
 }
 
 Scenario.prototype.increase = function(factor){
-	this.velocity -= factor * this.velocity;
+	this.velocity += factor * this.velocity;
 }
 
 Scenario.prototype.decrease = function(factor){
-	this.velocity += factor * this.velocity;
+	this.velocity -= factor * this.velocity;
 }
 
 module.exports = Scenario;
@@ -28304,6 +28330,9 @@ function SceneObjectManager(PIXI, stage, settings){
 	this.stage = stage;
 	
 	this.settings = settings;
+	this.nextGroundPosition = settings.groundtile.position;
+	
+	this.proceduralGeneration();
 }
 
 SceneObjectManager.prototype.animate = function(){
@@ -28311,7 +28340,14 @@ SceneObjectManager.prototype.animate = function(){
 	this.animateObjectList(this.pickups);
 	this.animateObjectList(this.obstacles);
 	this.animateObjectList(this.nonSolid);
+	this.nextGroundPosition = this.createRandomGroundObj(this.stage, this.nextGroundPosition);
 };
+
+SceneObjectManager.prototype.proceduralGeneration = function(){
+	while(this.groundObjects.length < CONSTANTS.OBJ_BUFFER){
+		this.nextGroundPosition = this.createRandomGroundObj(this.stage, this.nextGroundPosition);
+	}
+}
 
 SceneObjectManager.prototype.animateObjectList = function(list){
 	for(var i=0; i < list.length; i++){
@@ -28345,6 +28381,21 @@ SceneObjectManager.prototype.decreaseList = function(list, factor){
 	}
 };
 
+SceneObjectManager.prototype.createRandomGroundObj = function(stage, position){
+	 var r = getRandomInt(0, 2);
+	 var resultPos = position;
+	 if(r === 0){
+		 resultPos = this.createGroundObj(stage, position);
+	 }
+	 else if(r === 1 && CONSTANTS.OBJECT_TYPE_GROUND_MAX < position.y){
+		 resultPos = this.createGroundUpObj(stage, position);
+	 }
+	 else if(r === 2 && CONSTANTS.OBJECT_TYPE_GROUND_MIN > position.y){
+		 resultPos = this.createGroundDownObj(stage, position);
+	 }
+	 return resultPos;
+};
+
 /*
  * Create a basic ground object. 
  * 
@@ -28362,7 +28413,9 @@ SceneObjectManager.prototype.createGroundObj = function(stage, position){
 	this.groundObjects.push(obj);
 	obj.addObject(stage);
 	
-	//return position;
+	position.x = position.x + CONSTANTS.TILE_SIZE;
+	
+	return position;
 };
 
 /*
@@ -28396,7 +28449,9 @@ SceneObjectManager.prototype.createGroundUpObj = function(stage, position){
 	obj.addObject(stage);
 	obj2.addObject(stage);
 	
-	//return newPosition;
+	newPosition.x = newPosition.x + CONSTANTS.TILE_SIZE;
+	
+	return newPosition;
 };
 
 /*
@@ -28430,7 +28485,9 @@ SceneObjectManager.prototype.createGroundDownObj = function(stage, position){
 	obj.addObject(stage);
 	obj2.addObject(stage);	
 	
-	//return newPosition;
+	newPosition.x = newPosition.x + CONSTANTS.TILE_SIZE;
+	
+	return newPosition;
 };
 
 /*
@@ -28450,14 +28507,19 @@ SceneObjectManager.prototype.decay = function(){
  * apperance, we just need to check the first object
  */
 SceneObjectManager.prototype.decayObjectList = function(list){
-	if(list.length > 0 && list[0].isOutOfScene()){
+	while(list.length > 0 && list[0].isOutOfScene()){
 		var obj = list.shift();
 		obj.removeObject(this.stage);
+		console.log('decaying' + obj);
 	}	
 };
 
 function getLinearVelocity(angularVelocity, radius){
 	return radius * angularVelocity;
+}
+
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 module.exports = SceneObjectManager;
@@ -28466,9 +28528,8 @@ var CONSTANTS = require('./constants.js');
 
 function SceneObject(PIXI, type, subtype, texture, size, position, solid, velocity){
 	this.type = type;
+	this.subtype = subtype;
 	this.sprite = new PIXI.Sprite(texture);
-	this.sprite.anchor.x = 0.5;
-	this.sprite.anchor.y = 0.5;
 	this.sprite.position.x = position.x;
 	this.sprite.position.y = position.y;
 	this.sprite.width = size.width;
@@ -28490,16 +28551,33 @@ SceneObject.prototype.executeAnimation = function(factor){
 };
 
 SceneObject.prototype.increase = function(factor){
-	this.velocity -= factor * this.velocity;
+	this.velocity += factor * this.velocity;
 };
 
 SceneObject.prototype.decrease = function(factor){
-	this.velocity += factor * this.velocity;
+	this.velocity -= factor * this.velocity;
 };
 
 SceneObject.prototype.isOutOfScene = function(){
 	return (this.sprite.position.x + this.sprite.width < 0) 
 			|| (this.sprite.position.y + this.sprite.height < 0);
+};
+
+SceneObject.prototype.getGroundLine = function(){
+	var result = {};
+	if( this.subtype === CONSTANTS.OBJECT_TYPE_GROUND_RECT ){
+		result.a = [this.sprite.position.x, this.sprite.position.y];
+		result.b = [this.sprite.position.x + this.sprite.width, this.sprite.position.y];
+	}
+	else if( this.subtype === CONSTANTS.OBJECT_TYPE_GROUND_UP ){
+		result.a = [this.sprite.position.x, this.sprite.position.y + this.sprite.height];
+		result.b = [this.sprite.position.x + this.sprite.width, this.sprite.position.y];
+	}
+	else if( this.subtype === CONSTANTS.OBJECT_TYPE_GROUND_DOWN ){
+		result.a = [this.sprite.position.x, this.sprite.position.y];
+		result.b = [this.sprite.position.x + this.sprite.width, this.sprite.position.y + this.sprite.height];
+	}
+	return result;
 };
 
 module.exports = SceneObject;
@@ -28516,7 +28594,7 @@ TextObject.prototype.addText = function(stage){
 
 TextObject.prototype.executeAnimation = function(text){
 	if( text != undefined ){
-		this.text.setText(text);
+		this.text.text = text;
 	}
 }
 
