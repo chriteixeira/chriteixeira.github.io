@@ -46,6 +46,7 @@ var ld37;
             this.map.createFromObjects('objects', 9, 'box', 0, true, false, this.objects);
             this.objects.setAll('body.width', 28);
             this.objects.setAll('body.height', 28);
+            this.text = this.game.add.text(12, 500, '', { font: "25pt Courier", fill: "#FFFFFF", stroke: "#119f4e", strokeThickness: 2 });
         };
         GameLevel.prototype.update = function () {
             this.player.body.velocity.set(0);
@@ -106,6 +107,12 @@ var ld37;
                     && item.y >= this.roomZone.y && (item.y + 32) <= (this.roomZone.y + this.roomZone.height)) {
                     count++;
                 }
+            }
+            if (count === this.objects.children.length) {
+                this.text.setText("You moved all objects to the room. \nYou won!");
+            }
+            else {
+                this.text.setText("You moved " + count + " objects of " + this.objects.children.length + " to the room.\nContinue moving!!");
             }
         };
         return GameLevel;
